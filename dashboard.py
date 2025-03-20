@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 # Dashboard Title and Description
 # -------------------------------
 st.set_page_config(page_title="Booking Latency Dashboard", layout="wide")
-st.title("📊 Booking Latency Dashboard")
+st.title("🐲 Booking Latency Dashboard")
 st.markdown("""
 This dashboard visualizes and analyzes booking latency data (A→B→C).
 

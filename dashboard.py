@@ -122,21 +122,23 @@ st.dataframe(filtered_data[[
 st.markdown("""
 ---
 
-### 🚀 Deployment Instructions:
+### 📊 About This Dashboard
 
-1. **Ensure your data file `final_latency.xlsx` is in the same directory as this Python script.**
-2. **Install Streamlit and dependencies:**
-```bash
-pip install streamlit pandas openpyxl plotly
-```
+This interactive dashboard visualizes end-to-end booking latency data across three key stages:
+- **A → B:** Booking received → Booking pushed to system
+- **B → C:** Booking pushed → Invoice generated
+- **A → C:** Total latency from booking received to invoice creation
 
-3. **Run the dashboard locally:**
-```bash
-streamlit run dashboard.py
-```
+It was built to help the team monitor delays, identify breach trends, and improve operational efficiency.
 
-4. **Deploy to the cloud for free:**
-- [Streamlit Cloud](https://streamlit.io/cloud) allows easy deployment directly from a GitHub repository.
+---
 
-Once deployed, your dashboard will be accessible via a shareable URL.
+### ⚙️ Technical Approach:
+
+- **SQL Queries:** Extracted latency timestamps from production databases (bookings_master, sync_master, gms.bookings, gms_finance.invoices).
+- **Python + Pandas:** Merged datasets, computed total latency, and breach percentages based on 30-minute SLA threshold.
+- **Streamlit + Plotly:** Built this dashboard with interactive charts, filters, and summary KPIs.
+- **Deployment:** Hosted on Streamlit Cloud with a fully portable GitHub-based setup.
+
+This dashboard aims to help teams take **data-driven decisions** by making latency insights easy to analyze and actionable.
 """)

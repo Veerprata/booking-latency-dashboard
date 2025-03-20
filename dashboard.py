@@ -1,9 +1,8 @@
-# dashboard.py
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import re
 
 # -------------------------------
 # Dashboard Title and Description
@@ -21,6 +20,27 @@ Use this dashboard to identify latency issues and breach statistics.
 """)
 
 # ------------------------------------
+# Helper Function to Safely Parse Timedeltas
+# ------------------------------------
+def parse_timedelta_safe(value):
+    """
+    Safely convert various time strings into a pandas Timedelta.
+    - Converts 'X year(s)' into an approximate 'X*365 days'.
+    - Returns Timedelta(0) if parsing fails.
+    """
+    if pd.isna(value):
+        return pd.Timedelta(0)
+
+    s = str(value).strip().lower()
+    # Replace "X year" or "X years" with "X*365 days"
+    s = re.sub(r'(\d+)\s*year(s)?', lambda m: f"{int(m.group(1))*365} days", s)
+
+    try:
+        return pd.to_timedelta(s)
+    except:
+        return pd.Timedelta(0)
+
+# ------------------------------------
 # Load Data from Excel File
 # ------------------------------------
 @st.cache_data
@@ -34,7 +54,7 @@ data = load_data()
 # ------------------------------------
 # Calculate Metrics
 # ------------------------------------
-avg_total_latency = data['total_latency'].apply(pd.to_timedelta).mean()
+avg_total_latency = data['total_latency'].apply(parse_timedelta_safe).mean()
 total_bookings = data.shape[0]
 breach_count = data[data['breach_percentage'].apply(lambda x: float(x.rstrip('%'))) > 100].shape[0]
 breach_percentage_total = (breach_count / total_bookings) * 100
@@ -58,7 +78,7 @@ st.subheader("Total Latency per Booking (A→C)")
 fig_latency = px.bar(
     data,
     x="booking_code",
-    y=data['total_latency'].apply(pd.to_timedelta).dt.total_seconds()/60,  # in minutes
+    y=data['total_latency'].apply(parse_timedelta_safe).dt.total_seconds() / 60,  # in minutes
     labels={"y": "Total Latency (Minutes)", "booking_code": "Booking Code"},
     hover_data=["latency_a_to_b", "latency_b_to_c", "total_latency"],
     color_discrete_sequence=["#4E79A7"]
@@ -71,7 +91,6 @@ st.plotly_chart(fig_latency, use_container_width=True)
 # ------------------------------------
 st.subheader("Breach Percentage Distribution")
 
-# Categorize breaches
 def categorize_breach(breach):
     breach_val = float(breach.rstrip('%'))
     if breach_val <= 100:
@@ -115,7 +134,70 @@ st.dataframe(filtered_data[[
     "breach_percentage"
 ]])
 
+# ============================================================
+# Additional Graphs for Deeper Insights
+# ============================================================
 
+# 1. Trend of Average Total Latency Over Time
+st.subheader("Trend of Average Total Latency Over Time")
+
+# Ensure the booking received time is a datetime object
+data['booking_received_at'] = pd.to_datetime(data['booking_received_at'], errors='coerce')
+
+# Group by date and calculate average latency (in minutes)
+avg_latency_by_date = (
+    data.dropna(subset=['booking_received_at'])
+    .groupby(data['booking_received_at'].dt.date)['total_latency']
+    .apply(lambda x: x.apply(parse_timedelta_safe).mean().total_seconds() / 60)
+    .reset_index()
+)
+avg_latency_by_date.columns = ['Date', 'Avg Total Latency (Minutes)']
+
+fig_line = px.line(
+    avg_latency_by_date,
+    x="Date",
+    y="Avg Total Latency (Minutes)",
+    markers=True,
+    title="Average Total Latency Over Time"
+)
+st.plotly_chart(fig_line, use_container_width=True)
+
+# 2. Scatter Plot: A→B vs B→C Latencies
+st.subheader("Scatter Plot: A→B vs B→C Latencies")
+
+data['latency_a_to_b_min'] = data['latency_a_to_b'].apply(lambda x: parse_timedelta_safe(x).total_seconds() / 60)
+data['latency_b_to_c_min'] = data['latency_b_to_c'].apply(lambda x: parse_timedelta_safe(x).total_seconds() / 60)
+
+fig_scatter = px.scatter(
+    data,
+    x="latency_a_to_b_min",
+    y="latency_b_to_c_min",
+    hover_data=["booking_code"],
+    labels={
+        "latency_a_to_b_min": "Latency A→B (Minutes)",
+        "latency_b_to_c_min": "Latency B→C (Minutes)"
+    },
+    title="Scatter Plot: A→B vs B→C Latencies"
+)
+st.plotly_chart(fig_scatter, use_container_width=True)
+
+# 3. Box Plot: Total Latency Distribution by Breach Category
+st.subheader("Box Plot: Total Latency Distribution by Breach Category")
+
+data['total_latency_min'] = data['total_latency'].apply(lambda x: parse_timedelta_safe(x).total_seconds() / 60)
+
+fig_box = px.box(
+    data,
+    x="breach_category",
+    y="total_latency_min",
+    labels={"breach_category": "Breach Category", "total_latency_min": "Total Latency (Minutes)"},
+    title="Total Latency Distribution by Breach Category"
+)
+st.plotly_chart(fig_box, use_container_width=True)
+
+# ------------------------------------
+# Dashboard Overview and Technical Flow
+# ------------------------------------
 st.markdown("""
 ---
 ### 💡 **Dashboard Overview**

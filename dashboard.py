@@ -115,30 +115,46 @@ st.dataframe(filtered_data[[
     "breach_percentage"
 ]])
 
-# ------------------------------------
-# Deployment Note:
-# ------------------------------------
 
 st.markdown("""
 ---
+### 💡 **Dashboard Overview**
 
-### 📊 About This Dashboard
-
-This interactive dashboard visualizes end-to-end booking latency data across three key stages:
-- **A → B:** Booking received → Booking pushed to system
-- **B → C:** Booking pushed → Invoice generated
-- **A → C:** Total latency from booking received to invoice creation
-
-It was built to help the team monitor delays, identify breach trends, and improve operational efficiency.
+This dashboard provides an end-to-end visualization of latency across different stages of the booking and invoicing lifecycle. It's designed to help operations teams identify bottlenecks and assess performance against SLAs.
 
 ---
+### 🛠️ **Step-by-Step Technical Flow**
 
-### ⚙️ Technical Approach:
+➡️ **Step 1: Data Extraction via SQL**  
+• Bookings Received → `bookings_master.createdAt`  
+• Bookings Pushed → `sync_master.createdAt`  
+• Invoice Created → `gms_finance.invoices.created_at`
 
-- **SQL Queries:** Extracted latency timestamps from production databases (bookings_master, sync_master, gms.bookings, gms_finance.invoices).
-- **Python + Pandas:** Merged datasets, computed total latency, and breach percentages based on 30-minute SLA threshold.
-- **Streamlit + Plotly:** Built this dashboard with interactive charts, filters, and summary KPIs.
-- **Deployment:** Hosted on Streamlit Cloud with a fully portable GitHub-based setup.
+➡️ **Step 2: Latency Calculation using Python (Pandas)**  
+• Merge `A→B` and `B→C` CSVs using `booking_code`  
+• Convert latency strings into seconds using regex  
+• Compute total latency `A→C = A→B + B→C`
 
-This dashboard aims to help teams take **data-driven decisions** by making latency insights easy to analyze and actionable.
+➡️ **Step 3: Breach Calculation**  
+• Compare each total latency against 1800 seconds (30 min SLA)  
+• Calculate breach percentage using formula:
+```python
+Breach % = (Total Latency in Seconds / 1800) × 100
+```
+
+➡️ **Step 4: Data Visualization with Plotly + Streamlit**  
+• Interactive Bar Charts & Donut Charts  
+• Summary KPIs & Filters
+
+➡️ **Step 5: Deployment on Streamlit Cloud**  
+• Hosted with GitHub integration  
+• Instantly accessible through shareable URL
+
+---
+### 🎯 **Objective**
+- Enable real-time monitoring of latency performance
+- Visualize SLA breaches and improve operational response
+- Make insights accessible in a simple, interactive format
+
+---
 """)

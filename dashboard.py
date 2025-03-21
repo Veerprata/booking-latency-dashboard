@@ -54,7 +54,7 @@ data = load_data()
 # ------------------------------------
 # Calculate Metrics
 # ------------------------------------
-avg_total_latency = data['total_latency'].apply(parse_timedelta_safe).mean()
+avg_total_latency = data['total_latency'].apply(pd.to_timedelta).mean()
 total_bookings = data.shape[0]
 breach_count = data[data['breach_percentage'].apply(lambda x: float(x.rstrip('%'))) > 100].shape[0]
 breach_percentage_total = (breach_count / total_bookings) * 100

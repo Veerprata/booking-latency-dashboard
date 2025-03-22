@@ -6,83 +6,66 @@ ab_file = 'ab_latency.csv'    # A→B CSV file
 bc_file = 'bc_latency.csv'    # B→C CSV file
 output_file = 'final_latency.xlsx'  # Output Excel file
 
-# If total latency (A→C) exceeds threshold_sec, we'll compute a breach percentage
-threshold_sec = 1800  # 30 minutes = 1800 seconds
+# Threshold: 30 minutes = 1800 seconds
+threshold_sec = 1800
 
 # ---------------- Helper Functions ----------------
 
 def parse_latency_string(lat_str):
     """
     Parses a string into total number of seconds (float).
-    We handle three patterns:
-
-    Pattern C: "HH:MM:SS(.fraction)" e.g. "22:27:25.344478"
-    Pattern B: "X day(s), HH:MM:SS(.fraction)" e.g. "1 day, 2:19:01.113712"
-    Pattern A: "0 years 0 mons 0 days 0 hours 0 mins 12.565 secs"
-
+    Handles three patterns:
+      - Pattern C: "HH:MM:SS(.fraction)" e.g. "22:27:25.344478"
+      - Pattern B: "X day(s), HH:MM:SS(.fraction)" e.g. "1 day, 2:19:01.113712"
+      - Pattern A: "0 years 0 mons 0 days 0 hours 0 mins 12.565 secs"
     Returns None if parsing fails.
     """
-
     if not isinstance(lat_str, str):
         return None
 
-    # --- Pattern C: e.g. "22:27:25.344478" or "0:06:04.304215"
-    pattern_c = re.compile(
-        r'^(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+(\.\d+)?)$'
-    )
+    # Pattern C: "HH:MM:SS(.fraction)"
+    pattern_c = re.compile(r'^(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+(\.\d+)?)$')
     match_c = pattern_c.search(lat_str)
     if match_c:
         hours = float(match_c.group('hours'))
         minutes = float(match_c.group('minutes'))
         seconds = float(match_c.group('seconds'))
         total_sec = hours * 3600 + minutes * 60 + seconds
-        # Debug success
-        # print(f"[DEBUG] parse_latency_string matched Pattern C for: {lat_str} => {total_sec} sec")
         return total_sec
 
-    # --- Pattern B: "X day(s), HH:MM:SS(.fraction)" e.g. "1 day, 2:19:01.113712"
-    pattern_b = re.compile(
-        r'^(?P<days>\d+)\s+day[s]?,\s+(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+(\.\d+)?)$'
-    )
+    # Pattern B: "X day(s), HH:MM:SS(.fraction)"
+    pattern_b = re.compile(r'^(?P<days>\d+)\s+day[s]?,\s+(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+(\.\d+)?)$')
     match_b = pattern_b.search(lat_str)
     if match_b:
         days = float(match_b.group('days'))
         hours = float(match_b.group('hours'))
         minutes = float(match_b.group('minutes'))
         seconds = float(match_b.group('seconds'))
-        total_sec = (days * 86400) + (hours * 3600) + (minutes * 60) + seconds
-        # Debug success
-        # print(f"[DEBUG] parse_latency_string matched Pattern B for: {lat_str} => {total_sec} sec")
+        total_sec = days * 86400 + hours * 3600 + minutes * 60 + seconds
         return total_sec
 
-    # --- Pattern A: "0 years 0 mons 0 days 0 hours 0 mins 12.565 secs"
-    pattern_a = re.compile(
-        r'^(?P<days>\d+)\s+days?\s+(?P<hours>\d+)\s+hours?\s+(?P<minutes>\d+)\s+mins?\s+(?P<secs>\d+(\.\d+)?)\s+secs$'
-    )
+    # Pattern A: "0 years 0 mons 0 days 0 hours 0 mins 12.565 secs"
+    pattern_a = re.compile(r'^(?P<days>\d+)\s+days?\s+(?P<hours>\d+)\s+hours?\s+(?P<minutes>\d+)\s+mins?\s+(?P<secs>\d+(\.\d+)?)\s+secs$')
     match_a = pattern_a.search(lat_str)
     if match_a:
         days = float(match_a.group('days'))
         hours = float(match_a.group('hours'))
         minutes = float(match_a.group('minutes'))
         seconds = float(match_a.group('secs'))
-        total_sec = (days * 86400) + (hours * 3600) + (minutes * 60) + seconds
-        # Debug success
-        # print(f"[DEBUG] parse_latency_string matched Pattern A for: {lat_str} => {total_sec} sec")
+        total_sec = days * 86400 + hours * 3600 + minutes * 60 + seconds
         return total_sec
 
-    # If no pattern matched
     print(f"[DEBUG] parse_latency_string failed for: {lat_str}")
     return None
 
 def format_seconds_as_string(total_seconds):
     """
     Converts float seconds into a string like '0 days 00:12:34'
-    Rounds total_seconds to an integer so final display doesn't show fractional seconds.
+    Rounds total_seconds to an integer so the final display doesn't show fractional seconds.
     Returns '' if total_seconds is None/NaN.
     """
     if pd.isnull(total_seconds):
         return ''
-    # Round to nearest whole second
     rounded_sec = round(total_seconds)
     td = pd.to_timedelta(rounded_sec, unit='s')
     days = td.components.days
@@ -94,12 +77,34 @@ def format_seconds_as_string(total_seconds):
 def format_breach_percentage(value):
     """
     Formats the breach percentage with two decimals plus a trailing '%'.
-    Example: 123.456 -> '123.46%'
-    If value is None or NaN, returns ''.
+    (This helper is no longer used for the final display, but kept for legacy.)
     """
     if pd.isnull(value):
         return ''
     return f"{value:.2f}%"
+
+# ---------------- New Helper Functions to Remove Fractional Seconds ----------------
+
+def remove_fractional_seconds_from_datetime(dt_str):
+    """
+    Converts a datetime string like '2025-02-24T05:15:00.207' to '2025-02-24T05:15:00'
+    """
+    if not isinstance(dt_str, str):
+        return dt_str
+    try:
+        dt = pd.to_datetime(dt_str, errors='raise')
+        return dt.strftime('%Y-%m-%dT%H:%M:%S')
+    except Exception:
+        return dt_str
+
+def remove_fractional_seconds_from_latency(lat_str):
+    """
+    Converts a string like '0 years 0 mons 0 days 0 hours 0 mins 54.326 secs'
+    to '0 years 0 mons 0 days 0 hours 0 mins 54 secs'
+    """
+    if not isinstance(lat_str, str):
+        return lat_str
+    return re.sub(r'(\d+)\.\d+\s+secs', r'\1 secs', lat_str)
 
 # ---------------- Main Script ----------------
 
@@ -138,37 +143,55 @@ def main():
         print("Exception details:", e)
         return
 
-    # 5) Parse latencies
-    # B→C parse from 'latency_b_to_c_str' -> 'latency_b_to_c_sec'
+    # 5) Parse latencies for B→C
     if 'latency_b_to_c_str' in df_combined.columns:
         df_combined['latency_b_to_c_sec'] = df_combined['latency_b_to_c_str'].apply(parse_latency_string)
     else:
         df_combined['latency_b_to_c_sec'] = None
 
-    # 6) total_latency_sec = a_to_b + b_to_c
+    # 6) Sum latencies to get total_latency_sec = latency_a_to_b_sec + latency_b_to_c_sec
     if 'latency_a_to_b_sec' not in df_combined.columns:
         print("WARNING: 'latency_a_to_b_sec' column not found. Can't sum total.")
         df_combined['total_latency_sec'] = None
     else:
         df_combined['total_latency_sec'] = df_combined['latency_a_to_b_sec'] + df_combined['latency_b_to_c_sec']
 
-    # 7) Calculate breach percentage (float), then convert to string
-    df_combined['breach_float'] = df_combined['total_latency_sec'].apply(
-        lambda x: (x / threshold_sec) * 100 if pd.notnull(x) and x > threshold_sec else 0
-    )
-    df_combined['breach_percentage'] = df_combined['breach_float'].apply(format_breach_percentage)
+    # ---------------- New Breach/Threshold Logic ----------------
+    # Create a new column 'breach_category' that incorporates both:
+    #   - For bookings with total_latency_sec <= threshold_sec: label as "Within Threshold"
+    #   - For bookings exceeding threshold, compute a percentile ranking among only those rows and bin them.
+    within_mask = df_combined['total_latency_sec'] <= threshold_sec
+    exceed_mask = df_combined['total_latency_sec'] > threshold_sec
 
-    # 8) Create total_latency string
+    df_combined['breach_category'] = None
+    df_combined.loc[within_mask, 'breach_category'] = "Within Threshold"
+
+    if exceed_mask.sum() > 0:
+        # For rows exceeding the threshold, rank them by total_latency_sec among themselves.
+        percentiles = df_combined.loc[exceed_mask, 'total_latency_sec'].rank(pct=True)
+        df_combined.loc[exceed_mask, 'breach_rank'] = percentiles
+        # Now bin these percentiles into 6 categories.
+        df_combined.loc[exceed_mask, 'breach_category'] = pd.cut(
+            df_combined.loc[exceed_mask, 'breach_rank'],
+            bins=[0, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+            labels=["<=50th percentile", "50-60th percentile", "60-70th percentile", "70-80th percentile", "80-90th percentile", "90-100th percentile"],
+            include_lowest=True
+        )
+
+    # For final display, assign breach_category to breach_percentage column.
+    df_combined['breach_percentage'] = df_combined['breach_category']
+
+    # 7) Create total_latency string (formatted)
     df_combined['total_latency'] = df_combined['total_latency_sec'].apply(format_seconds_as_string)
 
-    # 9) Build final DataFrame with minimal columns
+    # 8) Build final DataFrame with minimal columns
     final_cols = [
         'booking_code',
         'booking_received_at',
         'booking_pushed_at',
         'invoice_created_at',
-        'latency_a_to_b_str',  # rename in final
-        'latency_b_to_c_str',  # rename in final
+        'latency_a_to_b_str',
+        'latency_b_to_c_str',
         'total_latency',
         'breach_percentage'
     ]
@@ -178,13 +201,19 @@ def main():
 
     df_final = df_combined[final_cols].copy()
 
-    # Rename them for final clarity
+    # Rename for final clarity
     df_final.rename(columns={
         'latency_a_to_b_str': 'latency_a_to_b',
         'latency_b_to_c_str': 'latency_b_to_c'
     }, inplace=True)
 
-    # 10) Save to Excel
+    # 9) Remove fractional seconds from selected columns
+    df_final['booking_received_at'] = df_final['booking_received_at'].apply(remove_fractional_seconds_from_datetime)
+    df_final['booking_pushed_at']   = df_final['booking_pushed_at'].apply(remove_fractional_seconds_from_datetime)
+    df_final['latency_a_to_b']      = df_final['latency_a_to_b'].apply(remove_fractional_seconds_from_latency)
+    df_final['latency_b_to_c']      = df_final['latency_b_to_c'].apply(remove_fractional_seconds_from_latency)
+
+    # 10) Save final DataFrame to Excel
     df_final.to_excel(output_file, index=False)
     print("Final merged data saved to:", output_file)
     print("Columns in final output:", df_final.columns.tolist())
